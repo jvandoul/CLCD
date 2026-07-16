@@ -1,0 +1,37 @@
+cff-version: 1.2.0
+
+title: "Controlled Latent Cognitive Dynamics (CLCD)"
+
+message: >
+  If you use this repository in academic work, please cite it using the
+  metadata provided below.
+
+type: software
+
+authors:
+  - family-names: Vandoulas
+    given-names: Ioannis
+
+repository-code: "https://github.com/jvandoul/CLCD"
+
+abstract: >
+  Controlled Latent Cognitive Dynamics (CLCD) is a research program
+  investigating whether machine reasoning can be improved by explicitly
+  controlling trajectories through latent state space using reusable
+  functional operators and a higher-level trajectory controller.
+
+keywords:
+  - artificial intelligence
+  - machine reasoning
+  - latent space
+  - reasoning
+  - activation steering
+  - representation engineering
+  - language models
+  - cognitive architectures
+
+license: "NOASSERTION"
+
+version: "0.2"
+
+date-released: "2026-07-16"
