@@ -1,0 +1,1939 @@
+
+CLCD Architecture Specification v0.2
+====================================
+
+Controlled Latent Cognitive Dynamics
+(method sections use the neutral term: Latent Trajectory Control)
+
+Status
+------
+Working technical research specification.
+This document defines a minimum implementable architecture for testing whether
+machine reasoning can be controlled as a trajectory through latent state space.
+
+This is not yet a validated theory, a production architecture, or a claim of human-like
+cognition. It is a falsifiable engineering proposal.
+
+Version
+-------
+v0.2
+
+Changes from v0.1 (summary)
+---------------------------
+1.  Added Section 3 (Related Work and Novelty Differentiation); the novelty claim
+    is now stated relative to specific prior lines of work.
+2.  Added Section 6 (State Injection Mechanism). v0.1 defined extraction P but not
+    the inverse pathway; all intervention experiments depend on it.
+3.  Added Section 4.3 (Causal Status of the State by Stage). The observational role
+    of s_t in Stages 1-2 versus its causal role in Stages 3+ is now explicit, and
+    hypothesis H4 is stage-qualified accordingly.
+4.  Added Section 4.2 (Geometry Requirements): whitening / normalization is now
+    mandatory before any norm- or cosine-based trajectory metric.
+5.  Added Section 9 (Measurement Definitions): operational definitions for
+    coherence, hypothesis quality, hypothesis potential, testability, and
+    repetition, plus a judge-separation protocol to prevent evaluator circularity.
+6.  Ω ("Creative Tension") renamed to Trajectory Regime Metric in method sections;
+    components are normalized; the H5 target zone must be pre-registered or
+    selected by cross-validation on held-out data (Section 12.2).
+7.  Added Section 17 (Statistical Analysis and Compute Accounting): seeds, tests,
+    multiple-comparison correction, minimum effect sizes, dataset sizing, and an
+    explicit definition of "equal compute" that includes controller overhead.
+8.  Baseline protocol now requires equal hyperparameter tuning budget (Section 20).
+9.  Symbol hygiene: repetition is ρ_t (was R_t), restructuring is Ψ_t (was R_t),
+    testability is U(s) (was T(s)), operator classifier is f_cls (was C).
+10. Controller summary state z_t now includes operator history (consistent with
+    the module interface).
+11. v0.1 Section 10 (Internal and External Dialogue) removed from the core spec
+    and deferred to Future Work (Section 27); it was underdeveloped and is not
+    needed for any v0.2 experiment.
+
+Research Lineage
+----------------
+DPHG  ->  MVCM  ->  CLCD
+
+DPHG:
+Dialogue Protocol for Hypothesis Generation
+
+MVCM:
+Minimum Viable Cognitive Model
+
+CLCD:
+Controlled Latent Cognitive Dynamics
+
+
+1. Core Objective
+=================
+
+The objective is to investigate whether machine reasoning can be improved by explicitly
+controlling transitions between latent states rather than relying only on next-token
+prediction or fixed reasoning loops.
+
+The central architectural claim is:
+
+Machine reasoning can be modeled and controlled as a trajectory through latent state
+space, where reusable state-dependent operators transform the current state and a
+higher-level controller selects among them in order to maintain productive dynamics.
+
+The architecture does not assume that a latent state is equivalent to a complete
+thought. It treats latent state as an operational representation that can be observed,
+compared, transformed, and evaluated.
+
+Terminology note:
+Cognitive vocabulary (cognitive state, creative tension, restructuring) is used in
+motivational sections only. Method and experiment sections use operational terms
+(latent state, trajectory regime metric Ω, persistent reorganization Ψ) to avoid
+importing untested psychological claims into the technical definitions.
+
+
+2. Scope
+========
+
+CLCD focuses on the following research questions:
+
+1. Can latent states be operationally extracted from a language model?
+
+2. Do different operator instructions produce statistically distinguishable latent
+   transition patterns?
+
+3. Can reusable operators be learned from these patterns?
+
+4. Can those operators causally influence downstream reasoning?
+
+5. Can a controller select operators dynamically according to the current trajectory?
+
+6. Does maintaining a productive latent dynamic improve hypothesis generation,
+   reasoning quality, or problem solving under equal compute budgets?
+
+Out of scope for v0.2:
+
+- modeling all aspects of human cognition
+- claiming consciousness or subjective experience
+- defining a universal theory of intelligence
+- training a foundation model from scratch
+- proving that latent states correspond one-to-one with semantic concepts
+- unifying internal and external dialogue (deferred; see Section 27)
+
+
+3. Related Work and Novelty Differentiation
+===========================================
+
+CLCD composes mechanisms that individually exist in prior work. The spec must be
+evaluated against that work explicitly.
+
+3.1 Activation steering / representation engineering
+-----------------------------------------------------
+(steering vectors: Subramani et al. 2022 [1], Turner et al. 2023 [2];
+contrastive activation addition: Rimsky et al. 2024 [3];
+representation engineering: Zou et al. 2023 [4];
+function vectors: Todd et al. 2024 [5];
+in-context vectors: Liu et al. 2024 [6])
+
+What exists:
+Fixed vectors added to the residual stream reliably shift model behavior along
+interpretable directions; function vectors capture task identity.
+
+What CLCD adds:
+The intervention vectors are (a) organized into a small operator alphabet defined by
+reasoning function rather than by content or style, (b) allowed to be state-dependent
+rather than fixed, and (c) selected online by a controller reading trajectory metrics.
+The existence of steering effects is therefore treated as established prior art, not
+as a CLCD contribution; Experiment C tests whether steering-style intervention can
+reproduce *operator-specific reasoning functions*, which is the open question.
+
+3.2 Structured reasoning search
+-------------------------------
+(Tree of Thoughts: Yao et al. 2023 [7]; Graph of Thoughts: Besta et al. 2024 [8];
+self-refine: Madaan et al. 2023 [9]; self-reflection: Shinn et al. 2023 [10];
+multi-agent debate: Du et al. 2023 [11]; meta-prompting: Suzgun & Kalai 2024 [12];
+Self-Discover: Zhou et al. 2024 [13])
+
+What exists:
+Search or scheduling over discrete reasoning moves expressed in text, with evaluators
+scoring intermediate text states.
+
+What CLCD adds:
+The state being tracked, scored, and controlled is a latent vector rather than text;
+the controller's inputs are geometric trajectory statistics (magnitude, directional
+diversity, coherence) rather than text-level self-evaluation; and at Stages 3+ the
+operators act directly on activations rather than through prompts.
+
+Consequence for interpretation:
+At Stage 1 (prompt-implemented operators), CLCD is a member of this family, and any
+Stage-1 result must be reported as "adaptive prompt scheduling versus fixed prompt
+scheduling", not as evidence for latent control. See Section 4.3.
+
+3.3 Latent-space reasoning
+--------------------------
+(continuous chain-of-thought / Coconut: Hao et al. 2024 [14]; recurrent
+hidden-state processing)
+
+What exists:
+Reasoning steps carried in continuous states without decoding to text.
+
+What CLCD adds:
+An explicit, discrete, human-auditable operator alphabet over those states, plus a
+controller and a trajectory-level objective, rather than end-to-end learned latent
+rollouts.
+
+3.4 Novelty claim (restated)
+----------------------------
+The proposed novelty is not latent reasoning, activation steering, self-reflection,
+or multi-agent dialogue. It is the combination of:
+
+1. an explicit operator alphabet defined by reasoning function
+2. reusable state-dependent latent transformations implementing that alphabet
+3. a higher-level controller selecting operators from trajectory geometry
+4. optimization of trajectory dynamics rather than only final output
+5. a measurable, pre-registered productive-regime hypothesis (Section 12)
+
+The single most novel component is (3)-(4): closed-loop control over latent
+trajectory statistics. If ablations show the controller contributes nothing beyond
+a random operator schedule, the novelty claim collapses to prior art.
+
+3.5 References
+--------------
+
+[1]  Subramani, N., Suresh, N., Peters, M. (2022). Extracting Latent Steering
+     Vectors from Pretrained Language Models. Findings of ACL 2022.
+[2]  Turner, A., Thiergart, L., Udell, D., Leech, G., Mini, U., MacDiarmid, M.
+     (2023). Activation Addition: Steering Language Models Without Optimization.
+     arXiv:2308.10248.
+[3]  Rimsky, N., Gabrieli, N., Schulz, J., Tong, M., Hubinger, E., Turner, A.
+     (2024). Steering Llama 2 via Contrastive Activation Addition. ACL 2024.
+[4]  Zou, A., et al. (2023). Representation Engineering: A Top-Down Approach to
+     AI Transparency. arXiv:2310.01405.
+[5]  Todd, E., Li, M., Sharma, A., Mueller, A., Wallace, B., Bau, D. (2024).
+     Function Vectors in Large Language Models. ICLR 2024.
+[6]  Liu, S., Ye, H., Xing, L., Zou, J. (2024). In-Context Vectors: Making
+     In-Context Learning More Effective and Controllable Through Latent Space
+     Steering. ICML 2024.
+[7]  Yao, S., Yu, D., Zhao, J., Shafran, I., Griffiths, T., Cao, Y.,
+     Narasimhan, K. (2023). Tree of Thoughts: Deliberate Problem Solving with
+     Large Language Models. NeurIPS 2023.
+[8]  Besta, M., et al. (2024). Graph of Thoughts: Solving Elaborate Problems
+     with Large Language Models. AAAI 2024.
+[9]  Madaan, A., et al. (2023). Self-Refine: Iterative Refinement with
+     Self-Feedback. NeurIPS 2023.
+[10] Shinn, N., Cassano, F., Gopinath, A., Narasimhan, K., Yao, S. (2023).
+     Reflexion: Language Agents with Verbal Reinforcement Learning.
+     NeurIPS 2023.
+[11] Du, Y., Li, S., Torralba, A., Tenenbaum, J., Mordatch, I. (2023).
+     Improving Factuality and Reasoning in Language Models through Multiagent
+     Debate. arXiv:2305.14325.
+[12] Suzgun, M., Kalai, A. (2024). Meta-Prompting: Enhancing Language Models
+     with Task-Agnostic Scaffolding. arXiv:2401.12954.
+[13] Zhou, P., et al. (2024). Self-Discover: Large Language Models Self-Compose
+     Reasoning Structures. arXiv:2402.03620.
+[14] Hao, S., Sukhbaatar, S., Su, D., Li, X., Hu, Z., Weston, J., Tian, Y.
+     (2024). Training Large Language Models to Reason in a Continuous Latent
+     Space (Coconut). arXiv:2412.06769.
+
+Citation details (venues, years) should be re-verified against the published
+versions before external circulation.
+
+
+4. Fundamental Objects
+======================
+
+4.1 Latent State
+----------------
+
+Let:
+
+s_t ∈ R^d
+
+where s_t is the operational latent state at step t.
+
+The state is extracted from model activations:
+
+s_t = P(H_t)
+
+where:
+
+H_t:
+hidden activations generated during the current reasoning episode
+
+P:
+a projection or pooling function
+
+Possible implementations of P include:
+
+- last-token hidden state
+- mean pooling across selected tokens
+- weighted attention pooling
+- layer aggregation
+- learned linear projection
+- autoencoder projection
+- state-summary embedding for early prototypes
+
+The implementation of P must be fixed within an experiment.
+
+Different implementations of P are considered different state encoders and must be
+evaluated separately.
+
+
+4.2 Geometry Requirements
+-------------------------
+
+Raw transformer activations are anisotropic: a small number of outlier dimensions
+can dominate norms and cosines, and activation norms grow with depth and context
+length. Therefore:
+
+Requirement G1:
+All trajectory metrics (Sections 8, 11, 12) are computed in a normalized space,
+not on raw activations.
+
+s'_t = W (s_t - μ)
+
+where μ and W are estimated on a held-out calibration set of episodes from the same
+model, layer, and encoder configuration. Acceptable choices for W:
+
+- whitening (ZCA or PCA) to identity covariance
+- per-dimension standardization as a minimum fallback
+- a learned metric, treated as part of the state encoder
+
+Requirement G2:
+μ and W are frozen before any experiment that uses them and are logged with the run
+(Section 24). Recomputing the normalization mid-experiment invalidates the run.
+
+Requirement G3:
+Robustness check: key results (separability, Ω-outcome association) must be
+reported under at least two normalization choices to show they are not artifacts
+of one metric.
+
+All formulas below assume the normalized state; primes are dropped for readability.
+
+
+4.3 Causal Status of the State by Stage
+---------------------------------------
+
+The causal role of s_t differs across implementation stages (Section 22), and every
+result must be labeled with the status under which it was obtained.
+
+Observational status (Stages 1-2):
+Generation is driven by the full token context / KV cache. s_t is a lossy summary
+computed *after the fact* and does not causally drive generation. Consequences:
+
+- Separability results (Experiment A) at these stages may reflect surface features
+  of operator prompts propagated into activations, not functional differences.
+  This is a measurement of representational footprint, not of control.
+
+- Controller results (Experiment D) at Stage 1 demonstrate only that adaptive
+  prompt scheduling can beat fixed scheduling. They must be reported as such.
+
+Causal status (Stages 3+):
+Operators modify activations directly through the injection mechanism (Section 6),
+so s_t (or its pre-image in the residual stream) is on the causal path to the
+output. Only results obtained under causal status can support the central claim
+of latent control.
+
+Hypotheses H1-H2 are testable under observational status. H3-H6 require causal
+status to carry their intended meaning; Stage-1 versions of H4-H6 are treated as
+pilot results only.
+
+
+4.4 Transition Vector
+---------------------
+
+The elementary observed transition is:
+
+δ_t = s_(t+1) - s_t
+
+Its magnitude is:
+
+m_t = ||δ_t||
+
+Its normalized direction is:
+
+u_t = δ_t / ||δ_t||
+
+Note: the difference form assumes local linear structure in the normalized space.
+This is a modeling choice, not a finding; if transition statistics prove unstable,
+alternative transition representations (e.g., log-map on a learned manifold) are a
+fallback, treated as a different encoder under Section 4.1 rules.
+
+The transition vector is not assumed to be intrinsically meaningful.
+
+Its meaning must be established experimentally through:
+
+- repeatability
+- separability
+- transferability
+- intervention
+- downstream effect
+
+
+4.5 Episode
+-----------
+
+An episode is:
+
+E = (x, s_0, a_0, s_1, a_1, ..., s_T, y)
+
+where:
+
+x:
+problem, evidence, or task input
+
+s_0:
+initial latent state
+
+a_t:
+operator selected at step t
+
+s_t:
+latent state
+
+y:
+final decoded output
+
+T denotes episode length in operator steps. (The symbol T with a subscript, T_a,
+always denotes an operator; bare T denotes episode length.)
+
+
+4.6 Operator
+------------
+
+An operator is a transformation:
+
+T_a : S -> S
+
+where a identifies the intended reasoning function.
+
+General form:
+
+s_(t+1) = T_a(s_t, x, ξ_t)
+
+where:
+
+x:
+active task context
+
+ξ_t:
+stochastic component
+
+An operator is not merely a textual instruction.
+
+It is considered validated only if it produces a repeatable and causally useful
+transformation across multiple contexts.
+
+
+5. Minimal Operator Alphabet
+============================
+
+The initial alphabet contains four operators.
+
+A = {
+    EXPAND,
+    CHALLENGE,
+    CONNECT,
+    CONSOLIDATE
+}
+
+This alphabet is intentionally minimal.
+
+
+5.1 EXPAND
+----------
+
+Purpose:
+
+Increase search breadth.
+
+Expected effects:
+
+- generate alternative explanations
+- introduce additional possibilities
+- increase local diversity
+- reduce premature convergence
+
+Textual prototype:
+
+"Generate multiple plausible alternatives that have not yet been considered."
+
+
+5.2 CHALLENGE
+-------------
+
+Purpose:
+
+Destabilize unsupported structure.
+
+Expected effects:
+
+- identify hidden assumptions
+- search for contradictions
+- generate counterexamples
+- revise overconfident claims
+
+Textual prototype:
+
+"Identify and challenge the weakest unsupported assumption."
+
+
+5.3 CONNECT
+-----------
+
+Purpose:
+
+Create relational structure between separated ideas.
+
+Expected effects:
+
+- discover analogies
+- bridge distant concepts
+- identify common mechanisms
+- produce integrative explanations
+
+Textual prototype:
+
+"Find a non-obvious but defensible connection between the current ideas."
+
+
+5.4 CONSOLIDATE
+---------------
+
+Purpose:
+
+Restore coherence and compress the current state.
+
+Expected effects:
+
+- remove redundancy
+- select stronger explanations
+- summarize current structure
+- stabilize a candidate hypothesis
+
+Textual prototype:
+
+"Produce the simplest coherent model that preserves the strongest insights."
+
+Prompt-artifact control:
+Each operator requires at least five paraphrases of its textual prototype (raised
+from three in v0.1), plus at least two adversarial control prompts that share
+surface form with an operator but request a different function. Paraphrase identity
+is logged and used as a nuisance factor in the separability analysis (Section 17).
+
+
+6. State Injection Mechanism
+============================
+
+v0.1 defined extraction (P) but not how a transformed state re-enters the model.
+Every intervention experiment (Stage 3+) depends on this definition.
+
+6.1 Definition
+--------------
+
+An injection mechanism is a function:
+
+I : (H_t, Δ) -> H'_t
+
+that maps current activations and an intended state change Δ to modified
+activations, such that generation proceeds from H'_t.
+
+CLCD v0.2 fixes the following default implementation:
+
+Residual-stream addition.
+
+An operator effect Δ_norm is estimated in the *normalized* state space
+(Section 4.2), while residual-stream activations h live in the *raw* activation
+space. The mapping back therefore has two explicit steps:
+
+Step 1 — de-normalize (normalized state space -> raw state space):
+
+Δ_raw = W⁻¹ Δ_norm
+
+The centering term μ cancels because Δ is a difference of states, not a state.
+If W is a non-square or rank-deficient whitening matrix, its pseudoinverse is
+used and logged.
+
+Step 2 — lift to the residual stream and add:
+
+h'_(l, i) = h_(l, i) + α * P⁺(Δ_raw)
+
+where:
+
+h_(l, i):
+residual-stream activation at layer l, token position i (raw space)
+
+P⁺:
+the (pseudo-)inverse of the state encoder's projection, mapping raw state space
+to the residual stream; for mean pooling over a token set this is broadcast
+addition over that set; for a learned linear P it is the Moore-Penrose
+pseudoinverse; for nonlinear encoders a learned decoder must be trained and
+validated for reconstruction error before use
+
+α:
+intervention strength, a logged hyperparameter
+
+Consistency rule: any Δ reported, compared, or learned (e.g., δ_a in Experiment
+C) is expressed in normalized space; conversion to raw space happens only inside
+the injection mechanism, in the two steps above. The reconstruction sanity check
+(6.3) is likewise evaluated in normalized space.
+
+6.2 Required intervention configuration
+---------------------------------------
+
+Every intervention run must specify and log (Section 24):
+
+- injection layer(s) l (default: the same layer(s) used for extraction)
+- token positions i (choices: last token only; all generated tokens; a fixed window)
+- schedule: single-shot (once at operator application) versus persistent
+  (re-applied at every generation step until the next operator)
+- strength α and any norm-matching or clamping applied
+- whether attention KV entries are also modified (default: no)
+
+Default configuration for the first intervention experiments:
+same layer as extraction, all subsequently generated token positions, persistent
+schedule, α selected on a calibration split by matching the norm of naturally
+observed δ for the same operator.
+
+6.3 Validity checks
+-------------------
+
+Before behavioral evaluation, each injection configuration must pass:
+
+- Reconstruction sanity: extracting the state immediately after injection recovers
+  s_t + Δ within a tolerance ε (logged).
+- Fluency preservation: perplexity of continuations under injection must not
+  degrade beyond a pre-set bound relative to no-injection controls; interventions
+  that break generation are classified as out-of-distribution, not as evidence
+  about operators.
+
+6.4 Failure semantics
+---------------------
+
+If no configuration passes 6.3, the correct conclusion is that this state
+encoder / injection pair is inadequate — not that operator geometry is absent.
+This distinction feeds Decision Gate 3 (Section 25).
+
+
+7. Transition Generator
+=======================
+
+The transition generator is:
+
+F_θ
+
+with:
+
+s_(t+1) = F_θ(s_t, a_t, x, ξ_t)
+
+Possible implementations:
+
+Stage 1:
+Prompt-conditioned LLM generation followed by state re-encoding
+(observational status; see 4.3)
+
+Stage 2:
+Prompt-conditioned hidden-state observation
+(observational status)
+
+Stage 3:
+Direct latent intervention via the injection mechanism of Section 6
+(causal status)
+
+Stage 4:
+Learned operator modules
+(causal status)
+
+Stage 5:
+Jointly trained transition generator
+(causal status)
+
+The generator may produce multiple candidate next states:
+
+{s~_(t+1)^1, ..., s~_(t+1)^m}
+    = GenerateTransitions(s_t, a_t, x)
+
+A selector may then choose:
+
+s_(t+1)
+    = argmax_s J_state(s | s_t, a_t, x)
+
+
+8. Measurement Definitions
+==========================
+
+v0.1 used coherence, hypothesis quality, hypothesis potential, and testability as
+primitives without operational definitions, while feeding them into the controller,
+the evaluator, and Ω. This created two problems: unmeasurable constructs, and a
+circularity risk when the same judge drives both inner-loop selection and outcome
+evaluation. This section fixes both.
+
+8.1 Metric registry
+-------------------
+
+Every quantity used by any module must be one of:
+
+Type G (geometric):
+computed from normalized states and transitions only.
+Examples: m_t, u_t, M_t, V_t, ρ_t, Ψ_t.
+
+Type E (embedding-based):
+computed from cosine similarities between state embeddings and reference
+embeddings (e.g., the encoded problem statement).
+Example: coherence C_t (8.2).
+
+Type J (judge-based):
+produced by an LLM judge or human rater from decoded text.
+Examples: Q_t, H(s), U(s).
+
+Type O (objective):
+computed from ground truth on hidden-solution tasks.
+Example: final task score.
+
+8.2 Coherence C_t (Type E)
+--------------------------
+
+C_t = cos( s_t , e_x )
+
+where e_x is the encoding of the active problem statement under the same state
+encoder and normalization. Optional variant: mean cosine to the problem statement
+and to the current best candidate hypothesis state. The variant used is fixed per
+experiment and logged.
+
+8.3 Repetition ρ_t (Type G)
+---------------------------
+
+ρ_t = max over j in [t-k, t-1] of cos(s_t, s_j)
+
+High ρ_t indicates return to previously visited regions.
+(v0.1 called this R_t; renamed to avoid collision with restructuring.)
+
+8.4 Candidate hypothesis quality Q_t, hypothesis potential H(s),
+    testability U(s) (Type J)
+----------------------------------------------------------------
+
+These are judge-based scores over decoded text on fixed rubrics (0-10 scales):
+
+Q_t: internal consistency, evidence contact, and specificity of the current
+     candidate hypothesis
+H(s): whether the decoded state contains material from which a hypothesis could
+     be formed
+U(s): whether the decoded content implies observable predictions
+     (v0.1 called this T(s); renamed to avoid collision with operators T_a.)
+
+8.5 Judge separation protocol
+-----------------------------
+
+Rule J1:
+The judge model (or rubric instance) used inside the loop — by the state evaluator
+or the controller — must be different from the judge used for outcome evaluation
+(different model family, or human raters for outcomes).
+
+Rule J2:
+Primary conclusions for H4-H6 must rest on Type O metrics (hidden-solution tasks)
+wherever available. Type J outcome metrics are secondary and must be reported with
+inter-rater or inter-judge agreement.
+
+Rule J3:
+Any experiment in which inner-loop selection and outcome evaluation share a judge
+must be labeled as such and cannot support a headline claim.
+
+Rationale: if the controller optimizes the same score that defines success, gains
+are guaranteed by construction and demonstrate selection, not improved reasoning.
+
+
+9. State Evaluator
+==================
+
+The state evaluator estimates the local utility of a candidate state.
+
+J_state(s)
+    = w_r R(s)
+    + w_n N(s)
+    + w_c C(s)
+    + w_h H(s)
+    + w_u U(s)
+    - w_d D(s)
+
+where:
+
+R(s):
+relevance to the active problem (Type E: cosine to problem encoding)
+
+N(s):
+novelty relative to prior states (Type G: 1 - max cosine to trajectory history)
+
+C(s):
+coherence (Type E, Section 8.2)
+
+H(s):
+hypothesis potential (Type J, Section 8.4)
+
+U(s):
+testability potential (Type J, Section 8.4)
+
+D(s):
+drift or redundancy penalty (Type G)
+
+The weights are experimental parameters and are subject to the tuning-budget rules
+of Section 20. Type J components inside J_state fall under judge Rule J1.
+
+
+10. Controller
+==============
+
+The controller selects the next operator:
+
+a_t = Π_φ(z_t)
+
+where z_t summarizes the current trajectory.
+
+Minimum controller state:
+
+z_t = (
+    M_t,
+    V_t,
+    C_t,
+    ρ_t,
+    Q_t,
+    A_hist_t
+)
+
+where:
+
+M_t:
+average transition magnitude over the recent window
+
+V_t:
+directional diversity
+
+C_t:
+coherence (Section 8.2)
+
+ρ_t:
+repetition / stagnation (Section 8.3)
+
+Q_t:
+quality of current candidate hypothesis (Section 8.4)
+
+A_hist_t:
+the sequence (or counts) of recently applied operators
+(added in v0.2; required by the controller interface in Section 14.3 and by
+Rules 2 and 5 below, which reference recent operator usage)
+
+
+10.1 Rule-Based Controller v0.2
+-------------------------------
+
+The rule set below contains 8 thresholds. All thresholds are hyperparameters and
+fall under the equal-tuning-budget protocol of Section 20.
+
+Rule 1: Stagnation
+
+If:
+
+M_t < θ_low
+
+or:
+
+ρ_t > θ_repeat
+
+then select:
+
+EXPAND or CONNECT
+
+
+Rule 2: Premature agreement
+
+If:
+
+C_t > θ_coherence_high
+
+and A_hist_t contains no CHALLENGE within the last k steps,
+
+then select:
+
+CHALLENGE
+
+
+Rule 3: Instability
+
+If:
+
+M_t > θ_high
+
+and:
+
+V_t > θ_diversity_high
+
+and:
+
+C_t < θ_coherence_low
+
+then select:
+
+CONSOLIDATE
+
+
+Rule 4: Fragmentation
+
+If multiple stable but weakly connected regions are detected
+(operationalized: clustering of the last k states yields ≥ 2 clusters with
+inter-cluster cosine below θ_frag),
+
+then select:
+
+CONNECT
+
+
+Rule 5: Candidate maturity
+
+If:
+
+Q_t > θ_quality
+
+and A_hist_t contains no CHALLENGE since the last consolidation,
+
+then select:
+
+CHALLENGE
+
+
+Rule 6: Stopping
+
+Stop when one of the following is satisfied:
+
+- hypothesis quality exceeds threshold
+- testability exceeds threshold
+- no operator produces improvement
+- maximum compute budget is reached
+- trajectory collapses into repetition (ρ_t persistently above θ_repeat)
+
+Stopping-rule note: different stopping behavior changes realized compute. Compute
+matching (Section 17.4) is applied to *realized* compute, not nominal budgets.
+
+
+11. Trajectory Regime Metric Ω
+==============================
+
+(Motivational name: Creative Tension. Method sections use "trajectory regime
+metric".)
+
+Ω_t is a macroscopic property of the recent latent trajectory, computed over a
+window of k steps from normalized quantities.
+
+Components (each rescaled to [0, 1] using calibration-set statistics, so the
+product is not dominated by scale differences):
+
+M̂_t:
+mean transition magnitude over the window, rescaled
+
+M_t = (1/k) Σ ||δ_i||
+
+V_t:
+directional diversity (already in [0, 1])
+
+V_t = 1 - ||(1/k) Σ u_i||
+
+C_t:
+coherence (Section 8.2), mapped from [-1, 1] to [0, 1]
+
+11.1 Target-Zone Form
+---------------------
+
+The architecture assumes that productive dynamics may occur inside an intermediate
+region rather than at maximum movement or maximum diversity.
+
+Define:
+
+g(M̂_t)
+    = exp(-(M̂_t - μ_M)^2 / (2σ_M^2))
+
+h(V_t)
+    = exp(-(V_t - μ_V)^2 / (2σ_V^2))
+
+Then:
+
+Ω_t = g(M̂_t) * h(V_t) * C_t
+
+Interpretation:
+
+- very low movement: stagnation
+- very high movement with low coherence: drift
+- moderate structured movement: potentially productive regime
+
+The multiplicative form is an initial modeling choice, not a claim; an additive
+form is a required ablation (Section 21).
+
+11.2 Pre-registration requirement
+---------------------------------
+
+The parameters μ_M, σ_M, μ_V, σ_V and the H5 zone bounds [Ω_L, Ω_U] are free
+parameters. With free bounds, some correlating interval can almost always be found
+post hoc, which would make H5 unfalsifiable in practice. Therefore:
+
+Rule Ω1:
+All Ω parameters and zone bounds must be either (a) pre-registered before the
+confirmatory run, based on pilot data, or (b) selected by cross-validation:
+fitted on a development split and evaluated once on a held-out confirmatory split.
+
+Rule Ω2:
+Exploratory scans over bounds are permitted but must be reported as exploratory,
+with the number of configurations tried.
+
+Rule Ω3:
+H5 is evaluated only on the held-out split, with the multiple-comparison
+corrections of Section 17.
+
+
+12. Restructuring Ψ_t
+=====================
+
+Restructuring is persistent reorganization rather than simple accumulation.
+(v0.1 symbol R_t; renamed to Ψ_t to avoid collision with repetition.)
+
+Initial approximation:
+
+Ψ_t
+    = ||s_after - s_before||
+      * Persistence_t
+      * Coherence_t
+
+Persistence may be estimated as:
+
+Persistence_t
+    = (1/k) Σ cos(
+        s_(t+j) - s_(t-1),
+        s_t - s_(t-1)
+      )
+
+A restructuring event is considered stronger when:
+
+- the state changes materially
+- the new direction persists
+- the new state remains relevant
+- future predictions or hypotheses change
+
+
+13. System Architecture
+=======================
+
+Logical pipeline:
+
+Problem / Evidence
+        |
+        v
+State Encoder  (P, normalization W, μ)
+        |
+        v
+Latent State s_t
+        |
+        v
+Trajectory Analyzer
+        |
+        v
+Trajectory Regime Metric Ω_t
+        |
+        v
+Controller Π
+        |
+        v
+Selected Operator a_t
+        |
+        v
+Transition Generator F
+  (Stage 1-2: prompt path)
+  (Stage 3+: injection mechanism I, Section 6)
+        |
+        v
+Candidate Next States
+        |
+        v
+State Evaluator
+        |
+        v
+Selected State s_(t+1)
+        |
+        v
+Stopping Condition
+        |
+        v
+Decoder / Final Hypothesis
+
+
+14. Module Interfaces
+=====================
+
+14.1 State Encoder
+------------------
+
+Input:
+
+- model activations
+- token positions
+- selected layers
+- pooling configuration
+- normalization parameters (μ, W) and calibration-set identifier
+
+Output:
+
+- normalized latent state s_t
+- encoder metadata
+- confidence or reconstruction error
+
+
+14.2 Trajectory Analyzer
+------------------------
+
+Input:
+
+- recent states
+- recent transition vectors
+- task representation
+
+Output:
+
+- M_t
+- V_t
+- C_t
+- ρ_t (repetition score)
+- fragmentation score
+- Ω_t
+
+
+14.3 Controller
+---------------
+
+Input:
+
+- trajectory metrics
+- operator history A_hist_t
+- compute budget consumed so far
+- candidate hypothesis state
+
+Output:
+
+- selected operator
+- operator confidence
+- decision rationale for logging
+
+
+14.4 Transition Generator
+-------------------------
+
+Input:
+
+- current latent state
+- selected operator
+- task context
+- stochastic seed
+- (Stage 3+) injection configuration (Section 6.2)
+
+Output:
+
+- one or more candidate next states
+- optional decoded intermediate reasoning
+
+
+14.5 State Evaluator
+--------------------
+
+Input:
+
+- candidate next states
+- current state
+- task context
+- prior trajectory
+
+Output:
+
+- candidate scores with metric-type labels (Section 8.1)
+- selected next state
+- score decomposition
+
+
+14.6 Decoder
+------------
+
+Input:
+
+- final latent state
+- task context
+
+Output:
+
+- final hypothesis
+- reasoning summary
+- proposed tests
+- confidence estimates
+
+
+15. Training Objectives
+=======================
+
+The architecture may eventually require several objectives.
+
+15.1 Operator Separability
+--------------------------
+
+Encourage transition distributions to be distinguishable:
+
+L_sep
+    = classification loss over operator labels from δ_t
+
+15.2 Operator Consistency
+-------------------------
+
+Encourage similar operators to produce comparable functional effects across contexts:
+
+L_consistency
+    = distance between normalized transition distributions
+
+15.3 Task Utility
+-----------------
+
+L_task
+    = downstream reasoning or solution loss
+
+15.4 Trajectory Quality
+-----------------------
+
+L_traj
+    = penalty for stagnation, drift, incoherence, and unnecessary length
+
+15.5 Intervention Fidelity
+--------------------------
+
+Ensure that direct latent intervention produces the intended operator behavior:
+
+L_intervention
+    = behavioral mismatch after operator application
+
+15.6 Combined Objective
+-----------------------
+
+L_total
+    = λ_1 L_task
+    + λ_2 L_sep
+    + λ_3 L_consistency
+    + λ_4 L_traj
+    + λ_5 L_intervention
+
+
+16. Operator Discovery Experiment
+=================================
+
+16.1 Objective
+--------------
+
+Test whether EXPAND, CHALLENGE, CONNECT, and CONSOLIDATE correspond to statistically
+distinguishable and causally useful latent transformations.
+
+16.2 Dataset
+------------
+
+Construct reasoning episodes from multiple domains:
+
+- causal puzzles
+- scientific explanation tasks
+- abductive reasoning
+- design problems
+- synthetic hypothesis reconstruction
+- contradiction resolution
+
+Sizing (revised from v0.1; see Section 17.2 for rationale):
+
+- Pilot (Stage 1): ≥ 30 problems per domain across ≥ 3 domains,
+  each problem run under all 4 operators and ≥ 5 paraphrases per operator,
+  ≥ 3 seeds. This yields ≥ 5,400 labeled transitions for the pilot classifier.
+- Confirmatory: ≥ 50 problems per domain across ≥ 4 domains, with a full
+  leave-one-domain-out protocol.
+
+Each episode must include:
+
+- initial problem
+- pre-operator state
+- explicit operator instruction (with paraphrase ID)
+- post-operator state
+- final output
+- task outcome
+
+16.3 Data Collection
+--------------------
+
+For every problem and operator:
+
+1. Encode pre-operator state:
+
+   s_before
+
+2. Apply textual prototype of operator a (paraphrase sampled and logged).
+
+3. Encode post-operator state:
+
+   s_after
+
+4. Compute:
+
+   δ_a = s_after - s_before
+
+5. Store:
+
+   (domain, problem, operator, paraphrase_id, seed,
+    s_before, s_after, δ_a, output, score)
+
+16.4 Experiment A: Separability
+-------------------------------
+
+Train a classifier:
+
+a_hat = f_cls(δ)
+
+Measure:
+
+- accuracy
+- macro F1
+- confusion matrix
+- cross-domain performance (leave-one-domain-out)
+- cross-paraphrase performance (leave-paraphrases-out): train on a subset of
+  paraphrases, test on held-out paraphrases; separability that survives this
+  split is less likely to be a prompt-wording artifact
+
+Success criterion:
+
+Operator prediction must exceed matched baselines and remain above chance under
+both cross-domain and cross-paraphrase testing, at the effect-size and
+significance thresholds of Section 17.
+
+Status note: under Stages 1-2 this experiment has observational status (4.3) and
+measures representational footprint, not control.
+
+16.5 Experiment B: Transfer
+---------------------------
+
+Estimate operator transformations on training domains.
+
+Apply them to unseen domains.
+
+Measure whether intended effects remain detectable.
+
+16.6 Experiment C: Intervention
+-------------------------------
+
+Apply operator transformation without textual operator instruction, using the
+injection mechanism and validity checks of Section 6.
+
+Operator function classes, in order of increasing capacity:
+
+Fixed vector:
+
+T_a(s) = s + v_a
+
+Linear operator:
+
+T_a(s) = A_a s + b_a
+
+State-dependent operator:
+
+T_a(s) = s + v_a(s)
+
+Nonlinear operator:
+
+T_a(s) = f_a(s)
+
+Measure whether the resulting behavior matches the intended function, using blind
+Type J raters (Rule J1) and Type O outcomes where available.
+
+A negative result at one capacity class licenses moving to the next class, not
+rejection of H3; rejection requires failure across classes with passing
+injection-validity checks (Section 6.3).
+
+16.7 Experiment D: Downstream Utility
+-------------------------------------
+
+Compare:
+
+A. Standard Q&A
+
+B. Fixed operator cycle
+
+C. Dynamic rule-based controller
+
+D. Learned controller
+
+Control for:
+
+- model
+- temperature
+- token budget
+- number of reasoning steps
+- sampling budget
+- external tools
+- hyperparameter tuning budget (Section 20)
+- realized compute including controller overhead (Section 17.4)
+
+Measure:
+
+- solution quality (Type O primary)
+- hypothesis quality (Type J, separated judge)
+- testability
+- novelty
+- coherence
+- compute efficiency
+
+16.8 Experiment E: Mediation by Ω
+---------------------------------
+
+Test whether controller performance is associated with time spent inside the
+pre-registered productive Ω region (Rule Ω1).
+
+The claim is stronger if:
+
+Controller
+    -> changes Ω trajectory
+    -> improves downstream result
+
+rather than merely:
+
+Controller
+    -> uses more computation
+    -> improves result
+
+Analysis: formal mediation analysis with realized compute entered as a covariate;
+partial effects reported with confidence intervals.
+
+
+17. Statistical Analysis and Compute Accounting
+===============================================
+
+(New in v0.2. v0.1 specified metrics but no inference procedure.)
+
+17.1 Units, seeds, and runs
+---------------------------
+
+- The unit of analysis for downstream comparisons is the problem instance;
+  transitions are nested within problems and domains.
+- Every condition is run with ≥ 5 random seeds. Reported values are means over
+  seeds with 95% confidence intervals.
+- Nested structure (transitions within problems within domains) is handled with
+  mixed-effects models or hierarchical bootstrap; naive pooling of transitions
+  as independent observations is not accepted.
+
+17.2 Power and sizing rationale
+-------------------------------
+
+Cell counts under the v0.1 sizing (30-100 total tasks) were insufficient: 4
+operators × 6 domains over 100 tasks yields ~4 transitions per cell. The Section
+16.2 sizing targets ≥ 100 transitions per operator-domain cell in the pilot and
+supports leave-one-domain-out evaluation in the confirmatory phase. A pilot-based
+power analysis must precede the confirmatory run; the confirmatory sample size is
+fixed from that analysis and pre-registered.
+
+17.3 Tests and multiple comparisons
+-----------------------------------
+
+- Separability (H1): permutation test against label-shuffled null; report macro
+  F1 with permutation p-value and bootstrap CI.
+- Utility comparisons (H4): pairwise tests on per-problem scores with
+  Holm-Bonferroni correction across the condition pairs.
+- The hypothesis family H1-H6 and the 10 falsification criteria constitute
+  multiple comparisons; confirmatory claims use a family-wise correction, and
+  each hypothesis is labeled confirmatory or exploratory in advance.
+- Minimum effects of interest (pre-registered defaults, adjustable in the
+  pre-registration only): separability macro F1 ≥ 0.45 over a 0.25 chance level
+  (4 classes); downstream utility gain ≥ 0.3 standardized effect (Cohen's d)
+  over the strongest matched baseline.
+
+17.4 Definition of equal compute
+--------------------------------
+
+"Equal compute" in H4 and Experiment D means equal *realized* cost per problem,
+accounted in two ledgers, both logged:
+
+Ledger 1 — model tokens: all tokens generated and consumed by the base model,
+including operator prompts, decoded intermediate reasoning, and judge calls made
+inside the loop.
+
+Ledger 2 — total FLOPs (or wall-clock proxy): Ledger 1 plus state extraction,
+normalization, trajectory analysis, controller execution, and candidate-state
+evaluation.
+
+A controller advantage that exists under Ledger 1 but disappears under Ledger 2
+must be reported as an efficiency trade-off, not as a reasoning improvement.
+Because stopping rules change realized compute (Section 10.1), matching is
+enforced on realized, not nominal, budgets — e.g., by granting baselines the
+same realized-compute distribution via extended sampling.
+
+
+18. Hypotheses
+==============
+
+H1: Operator Separability (observational status sufficient)
+
+Transition vectors conditioned on different operators are statistically
+distinguishable:
+
+P(a_hat = a | δ_a) > chance
+
+under cross-domain and cross-paraphrase evaluation (16.4).
+
+
+H2: Cross-Domain Transfer (observational status sufficient)
+
+Operator transformations learned in one domain preserve measurable functional
+effects in unseen domains.
+
+
+H3: Causal Intervention (requires causal status)
+
+Direct application of a learned operator transformation, via the injection
+mechanism of Section 6, changes reasoning behavior in the intended direction
+without an explicit textual instruction.
+
+
+H4: Dynamic Controller Advantage (stage-qualified)
+
+Under equal realized compute (17.4):
+
+Quality_dynamic > Quality_fixed > Quality_QA
+
+H4-S1 (Stage 1 form): adaptive prompt scheduling outperforms fixed prompt
+scheduling. This is a pilot claim about scheduling, not about latent control.
+
+H4-S3 (Stage 3+ form): the advantage persists when operators are applied by
+latent intervention. Only H4-S3 supports the central claim.
+
+
+H5: Productive Regime Zone (requires pre-registration, Rule Ω1)
+
+High-quality hypotheses occur more frequently when:
+
+Ω_t ∈ [Ω_L, Ω_U]
+
+than outside it, where [Ω_L, Ω_U] was fixed before the confirmatory run.
+
+
+H6: Mediation
+
+The benefit of the controller is partly mediated by changes in latent trajectory
+dynamics rather than only by additional tokens or steps, with realized compute
+as a covariate (16.8).
+
+
+19. Falsification Criteria
+==========================
+
+CLCD v0.2 is weakened or falsified in its simple form if:
+
+1. Operator-conditioned transition distributions cannot be distinguished beyond
+   prompt artifacts (i.e., separability fails the cross-paraphrase split).
+
+2. Separability disappears under cross-domain evaluation.
+
+3. Learned transformations fail to cause the intended behavior across all
+   capacity classes of 16.6, with passing injection-validity checks.
+
+4. Direct intervention degrades reasoning or produces arbitrary effects despite
+   passing the fluency-preservation check.
+
+5. Dynamic policies do not outperform matched baselines under equal tuning
+   budgets (Section 20).
+
+6. Any performance gain disappears after equalizing realized compute
+   (Ledger 2, 17.4).
+
+7. Ω_t does not predict outcome quality on the held-out confirmatory split.
+
+8. A simpler metric fully explains all observed gains.
+
+9. Operators fail to transfer between contexts.
+
+10. Latent state extraction is too unstable to support reproducible measurement
+    (i.e., Requirement G3 robustness checks fail).
+
+A negative result may falsify only a specific implementation, such as fixed-vector
+operators or a particular injection configuration (6.4), without falsifying the
+broader controlled-dynamics hypothesis. Such scoping must be declared in advance
+per Decision Gate, not constructed after the result.
+
+
+20. Baselines and Tuning-Budget Protocol
+========================================
+
+Required baselines:
+
+- direct answer
+- chain-of-thought
+- self-reflection
+- fixed deliberation loop
+- majority sampling
+- tree search
+- multi-agent debate
+- prompt-only operator cycle
+- equal-token random operator policy
+
+The random operator policy is especially important because it tests whether
+operator *selection* matters beyond extra computation.
+
+Tuning-budget protocol (new in v0.2):
+
+The rule-based controller has ≥ 8 free thresholds (10.1) and the evaluator has
+free weights (Section 9). A tuned controller compared against untuned baselines
+produces artifactual gains. Therefore:
+
+- Every condition (baselines included) receives the same hyperparameter search
+  budget, defined as an equal number of configuration evaluations on the same
+  development split.
+- Baselines with no natural hyperparameters spend the budget on their available
+  knobs (temperature, exemplar selection, sampling width, tree depth).
+- The search space, budget, and selected configurations are logged for every
+  condition.
+- Final comparisons run once on the held-out confirmatory split.
+
+
+21. Ablation Studies
+====================
+
+Remove or modify one component at a time:
+
+- no trajectory regime estimator (Ω)
+- additive instead of multiplicative Ω (11.1)
+- no controller
+- fixed operator order
+- random operator order
+- three operators instead of four
+- no CONNECT
+- no CHALLENGE
+- no state evaluator
+- fixed-vector versus state-dependent operators
+- single-layer versus multi-layer state encoder
+- no persistence metric
+- alternative normalization (Requirement G3)
+
+The architecture is supported only if its key components contribute independently.
+
+
+22. Implementation Stages
+=========================
+
+Each stage is labeled with the causal status of its results (Section 4.3).
+
+Stage 1: Symbolic Orchestration  [observational]
+------------------------------------------------
+
+Operators are implemented through prompts.
+
+Goal:
+
+Validate task design, logging, baselines, and controller logic.
+
+Interpretation constraint: results at this stage are adaptive-prompt-scheduling
+results (Section 3.2) and support H4-S1 only.
+
+
+Stage 2: Latent Observation  [observational]
+--------------------------------------------
+
+Extract hidden states and measure transitions.
+
+Goal:
+
+Test separability (H1) and trajectory metrics.
+
+
+Stage 3: Latent Intervention  [causal]
+--------------------------------------
+
+Apply activation-level transformations via the injection mechanism (Section 6).
+
+Goal:
+
+Test causality (H3).
+
+
+Stage 4: Learned Operators  [causal]
+------------------------------------
+
+Learn T_a for each function class (16.6).
+
+Goal:
+
+Replace textual prompts with reusable latent transformations.
+
+
+Stage 5: Dynamic Controller  [causal]
+-------------------------------------
+
+Learn Π(a_t | z_t).
+
+Goal:
+
+Select operators according to trajectory dynamics (H4-S3).
+
+
+Stage 6: Joint Training  [causal]
+---------------------------------
+
+Jointly optimize:
+
+- state encoder
+- operators
+- controller
+- state evaluator
+- stopping policy
+
+
+Stage 7: Emergent Alphabet  [causal]
+------------------------------------
+
+Allow the architecture to discover additional operators or merge redundant ones.
+
+Goal:
+
+Determine whether the original human-defined alphabet is necessary.
+
+
+23. Research Risks
+==================
+
+23.1 Representation Artifact
+
+Observed operator differences may reflect prompt wording rather than function.
+
+Mitigation:
+
+- ≥ 5 paraphrases per operator plus adversarial controls (Section 5)
+- cross-paraphrase splits in Experiment A (16.4)
+- cross-domain validation
+- prompt-free latent intervention (Stage 3)
+
+
+23.2 Layer Dependence
+
+Operator geometry may exist only in specific layers.
+
+Mitigation:
+
+- multi-layer analysis
+- layer-wise probing
+- projection robustness tests
+
+
+23.3 Model Dependence
+
+Operators may not transfer across model families.
+
+Mitigation:
+
+- treat cross-model transfer as a separate hypothesis
+- begin with within-model validation
+
+
+23.4 Semantic Overclaim
+
+Latent vectors may correlate with behavior without representing interpretable
+thoughts.
+
+Mitigation:
+
+- operational terminology in method sections (Section 1)
+- require causal intervention
+- avoid claims of semantic identity
+
+
+23.5 Compute Confound
+
+Improvement may come only from extra reasoning steps.
+
+Mitigation:
+
+- two-ledger realized-compute matching (17.4)
+- token-budget controls
+- random-policy baselines
+
+
+23.6 Evaluation Bias and Circularity
+
+LLM judges may favor familiar structure; a shared judge between inner loop and
+outcome evaluation guarantees artifactual gains.
+
+Mitigation:
+
+- judge separation protocol (8.5)
+- objective hidden-solution tasks as primary outcomes
+- human blind review
+- downstream testing
+
+
+23.7 Metric Instability
+
+Trajectory geometry may be an artifact of a particular normalization.
+
+Mitigation:
+
+- Requirements G1-G3 (Section 4.2)
+- report key results under ≥ 2 normalization choices
+
+
+24. Logging Requirements
+========================
+
+Every run should record:
+
+- model and checkpoint
+- layer selection
+- state encoder and normalization parameters (μ, W, calibration-set ID)
+- random seed
+- problem identifier and domain
+- operator selected and paraphrase ID
+- operator source (controller rule fired, or policy output)
+- injection configuration when applicable (Section 6.2) and validity-check results
+- state before / state after
+- transition vector
+- trajectory metrics (M_t, V_t, C_t, ρ_t, Ψ_t)
+- Ω_t and its parameters
+- candidate state scores with metric-type labels (8.1)
+- judge identity for every Type J score
+- final output
+- final task score (Type O where available)
+- realized compute, both ledgers (17.4)
+- hyperparameter search budget consumed (Section 20)
+- stopping reason
+
+Reproducibility is a design requirement.
+
+
+25. Decision Gates
+==================
+
+Gate 1:
+Are operator transitions separable under cross-paraphrase and cross-domain splits?
+
+If no:
+Revise state encoder or operator definitions.
+
+
+Gate 2:
+Do operator effects transfer across contexts?
+
+If no:
+Test state-dependent or nonlinear operators.
+
+
+Gate 3:
+Can direct intervention reproduce operator behavior?
+
+If no, and injection-validity checks (6.3) pass:
+The observed geometry may be correlational only.
+
+If no, and injection-validity checks fail:
+The encoder / injection pair is inadequate (6.4); revise it before concluding
+anything about operator geometry.
+
+
+Gate 4:
+Does the controller improve performance under equal realized compute and equal
+tuning budget?
+
+If no:
+Revise policy or reject the controller hypothesis.
+
+
+Gate 5:
+Does Ω_t explain useful variance on the held-out confirmatory split?
+
+If no:
+Replace or remove the trajectory regime construct.
+
+
+26. Minimum Prototype
+=====================
+
+The minimum prototype may be implemented without training a new model.
+
+Components:
+
+1. Open-weight LLM with hidden-state access
+
+2. State encoder using one selected layer, with normalization (4.2)
+
+3. Four textual operator prompts with ≥ 5 paraphrases each
+
+4. Rule-based controller
+
+5. Logging of s_t and δ_t per Section 24
+
+6. Basic trajectory metrics
+
+7. Hidden-solution reasoning dataset sized per Section 16.2 (pilot tier)
+
+8. Three baselines:
+   - direct answer
+   - fixed cycle
+   - random operator policy at equal realized compute
+
+The prototype is successful if it produces usable experimental data, even if it
+does not improve task performance.
+
+
+27. Future Work (deferred from v0.1)
+====================================
+
+Internal and external dialogue as a unified transition source.
+
+v0.1 proposed treating internal dialogue (source(a_t) = same entity) and external
+dialogue (source(a_t) = different entity) under one transition equation. The idea
+is retained as a research direction but removed from the core specification: it
+added no testable content to v0.2 experiments and was underdeveloped relative to
+the rest of the document. It should return only with its own operationalization
+and experiment design.
+
+Cross-model operator transfer (23.3) is likewise future work.
+
+
+28. Current Central Claim
+=========================
+
+Machine reasoning may be treated as a controllable latent dynamical process.
+
+Reusable operators transform the current latent state.
+
+A higher-level controller selects among those operators according to the recent
+trajectory.
+
+The system seeks neither maximum stability nor maximum disruption. It seeks a
+productive region in which coherent restructuring and useful hypothesis generation
+become more likely.
+
+Scope note: this claim is supported only by results obtained under causal status
+(Stages 3+). Observational-stage results inform feasibility but cannot establish it.
+
+
+29. Immediate Next Actions
+==========================
+
+1. Select one open-weight model with hidden-state access.
+
+2. Select one layer or define a simple layer-combination method; fit and freeze
+   normalization on a calibration split (4.2).
+
+3. Build the pilot dataset per Section 16.2 (≥ 30 problems per domain, ≥ 3
+   domains, hidden solutions).
+
+4. Write ≥ 5 paraphrases and ≥ 2 adversarial controls per operator.
+
+5. Implement state extraction and transition logging (Section 24).
+
+6. Run Experiment A with cross-paraphrase and cross-domain splits.
+
+7. Run a pilot power analysis; pre-register confirmatory sample sizes, Ω
+   parameters, and minimum effect sizes (17.2, 11.2).
+
+8. Compare fixed-cycle, random-policy, and rule-based controller at equal
+   realized compute and equal tuning budget.
+
+9. Verify the Section 3.5 citations against published versions before external
+   circulation.
+
+10. Publish negative as well as positive results.
+
+11. Revise this specification based on measured behavior.
+
+12. Do not expand the theory until the first operator dataset exists.
+
+
+End of CLCD Architecture Specification v0.2
+===========================================

@@ -1,0 +1,1173 @@
+
+CLCD Trajectory-First Research Plan v0.2
+========================================
+
+Controlled Latent Cognitive Dynamics
+
+Status
+------
+Working research plan.
+
+Purpose
+-------
+This document defines the trajectory-first development path for CLCD.
+
+It does not replace the CLCD Architecture Specification v0.2 (hereafter "the
+Spec"). It changes the order of investigation so that operators, trajectory
+regimes, and controller policies are discovered from data rather than assumed
+in advance.
+
+The central methodological shift is:
+
+Trajectories
+    ->
+Recurring Functional Modes
+    ->
+Causal Operators
+    ->
+Trajectory Regimes
+    ->
+Closed-Loop Controller
+
+Version
+-------
+v0.2
+
+Changes from v0.1 (summary)
+---------------------------
+1.  Added Section 3 (Binding Protocols): the Spec's metric registry, judge
+    separation protocol, geometry requirements, statistical plan, and
+    tuning-budget protocol are declared binding for this plan. v0.1 silently
+    dropped them, reintroducing the circularity the Spec had fixed.
+2.  Added Section 4 (Step Definition). What constitutes one latent reasoning
+    step was an action item in v0.1; it is foundational, because every
+    trajectory feature presupposes the time discretization. Step definitions
+    are now treated like state encoders: fixed per experiment, with ≥ 2
+    variants required for robustness.
+3.  Trajectory features now have explicit discrete-space definitions
+    (Section 5.5); v0.1 named velocity, acceleration, and curvature without
+    defining them.
+4.  Added seed-label independence criterion (Section 9.5): discovered modes
+    must be shown not to merely recover the seed intervention labels
+    (mutual-information check, cross-source recurrence).
+5.  Added outcome-conditioning confound controls (Section 8.6): matched-length
+    controls and difficulty stratification for successful-versus-unsuccessful
+    comparisons.
+6.  d_functional weight sensitivity requirement and an operational definition
+    of d_context (Section 9.2-9.3).
+7.  Defined how the desired regime r* is set, with data splits preventing
+    leakage between regime discovery and controller training (Section 12.3).
+8.  Added Section 13 (Additional Related Work): options / skill discovery in
+    hierarchical RL and latent dynamics methods from computational
+    neuroscience.
+9.  Added a parallel low-cost track (Section 8.7): the Spec's Experiment A
+    (seed-operator separability) runs on Atlas data at near-zero marginal
+    cost, de-risking the slower discovery-first path.
+10. Atlas sizing targets added (Section 8.2).
+11. Symbol hygiene: the temporal window length is now w (v0.1 used k, which
+    collided with the mode index k in O_k, T_k). Ω_vec dimensions are marked
+    as named placeholders pending operational definitions (Section 11.4).
+12. Gate A extended with failure semantics distinguishing "no structure" from
+    "inadequate representation or step definition" (Section 15).
+
+
+1. Research Motivation
+======================
+
+The Spec defines:
+
+- latent states
+- transition vectors
+- candidate cognitive operators
+- a trajectory regime metric
+- a higher-level controller
+- causal intervention stages
+
+However, the architecture still assumes that human-defined operators such as
+EXPAND, CHALLENGE, CONNECT, and CONSOLIDATE are the correct functional
+primitives.
+
+The trajectory-first plan removes that assumption.
+
+The first scientific question becomes:
+
+Does the space of latent reasoning trajectories contain stable, recurring,
+functionally meaningful, and causally reusable structure?
+
+If no such structure exists, the operator-based architecture is weakened.
+
+If such structure exists, operators should be derived from that structure
+rather than imposed as labels.
+
+
+2. Revised Core Hypothesis
+==========================
+
+Let a reasoning trajectory be:
+
+Γ = (s_0, s_1, ..., s_T)
+
+where:
+
+s_t ∈ R^d
+
+is the normalized latent state at step t (normalization per Spec Section 4.2).
+
+The local transition is:
+
+δ_t = s_(t+1) - s_t
+
+The revised core hypothesis is:
+
+There exist recurring trajectory motifs or transformation modes that:
+
+1. appear across multiple problems and domains
+2. produce similar downstream functional effects
+3. can be represented by reusable transformations
+4. causally influence future reasoning when applied to unseen states
+5. can be selected by a controller to improve reasoning under matched compute
+
+
+3. Binding Protocols Inherited from the Spec
+============================================
+
+(New in v0.2.)
+
+The following Spec protocols apply to every phase of this plan without
+restatement. Any experiment violating them cannot support a headline claim.
+
+B1 — Metric registry (Spec 8.1):
+Every quantity is labeled Type G (geometric), Type E (embedding), Type J
+(judge), or Type O (objective). This matters doubly here, because functional
+effect profiles (Section 5.6) mix types.
+
+B2 — Judge separation (Spec 8.5):
+No judge used inside mode discovery or controller loops may also serve as an
+outcome judge. If modes are discovered using Type J effect components and
+later validated by the same judge, the discovery is circular by construction.
+
+B3 — Geometry requirements (Spec 4.2, G1-G3):
+All trajectory features are computed in normalized space; key results must be
+shown under ≥ 2 normalization choices.
+
+B4 — Statistical plan (Spec 17):
+Seeds (≥ 5), mixed-effects or hierarchical bootstrap for nested data,
+permutation nulls, family-wise correction, pre-registered minimum effects,
+confirmatory/exploratory labeling, and two-ledger realized-compute accounting.
+This plan adds Atlas-specific sizing in Section 8.2 but adds no exemptions.
+
+B5 — Tuning budget (Spec 20):
+Equal hyperparameter search budget across all compared conditions, including
+clustering pipelines when cluster-based claims are compared against baselines.
+
+B6 — Injection mechanism (Spec 6):
+All causal interventions in Phase C use the Spec's two-step injection
+(de-normalize, then lift) with its validity checks and failure semantics.
+
+
+4. Step Definition
+==================
+
+(New in v0.2; promoted from v0.1 Immediate Action 4.)
+
+Every trajectory feature — velocity, acceleration, curvature, recurrence —
+presupposes a time discretization. Different step definitions produce
+different geometry, and Atlas results could be artifacts of this choice
+alone. Therefore step definitions are governed like state encoders.
+
+4.1 Candidate step definitions
+------------------------------
+
+ST-1  Token step:
+      one state per generated token (finest; noisiest; longest sequences)
+
+ST-2  Sentence / clause step:
+      one state per sentence boundary in decoded reasoning
+
+ST-3  Reasoning-move step:
+      one state per prompted intervention or self-delimited reasoning move
+      (coarsest; matches the Spec's operator step)
+
+4.2 Rules
+---------
+
+S1: The step definition is fixed within an experiment and logged with the run.
+
+S2: Different step definitions are different trajectory representations and
+    are analyzed separately, like different encoders (Spec 4.1 rules).
+
+S3: Headline Atlas claims (motif existence, regime-outcome association) must
+    replicate under at least two step definitions, or be explicitly reported
+    as step-definition-specific.
+
+S4: Features that mix scales (e.g., recurrence over long windows on token
+    steps) must state the window in steps and in tokens, so results are
+    comparable across definitions.
+
+
+5. Fundamental Objects
+======================
+
+5.1 State Space
+---------------
+
+S ⊆ R^d
+
+The operational latent state space produced by the selected encoder,
+normalization (B3), and step definition (Section 4).
+
+5.2 Trajectory
+--------------
+
+Γ_i = (s_0, s_1, ..., s_T)
+
+A complete reasoning episode in latent state space.
+
+5.3 Local Transition
+--------------------
+
+δ_t = s_(t+1) - s_t
+
+A local displacement in the normalized latent space.
+
+5.4 Trajectory Segment
+----------------------
+
+Γ_(t-w:t) = (s_(t-w), ..., s_t)
+
+A local temporal window of length w used to characterize context-dependent
+transitions. (v0.1 used k for the window; renamed to w to avoid collision
+with the mode index k.)
+
+5.5 Trajectory Features
+-----------------------
+
+r_t = r(Γ_(t-w:t))
+
+Features and their discrete-space definitions (all on normalized states):
+
+- transition magnitude:      m_t = ||δ_t||
+- velocity (mean speed):     (1/w) Σ ||δ_i|| over the window
+- acceleration:              second difference, ||δ_t - δ_(t-1)||,
+                             averaged over the window
+- directional consistency:   mean pairwise cos(u_i, u_j) over the window
+- directional diversity:     V = 1 - ||(1/w) Σ u_i||
+- curvature (discrete):      angle between successive unit transitions,
+                             arccos( cos(u_t, u_(t-1)) ), averaged
+- recurrence:                max cosine of s_t to states before the window
+- convergence rate:          slope of ||δ_i|| over the window
+- local dimensionality:      participation ratio of the window's PCA spectrum
+- spectral entropy:          entropy of the normalized singular-value spectrum
+                             of the windowed state matrix
+- perturbation sensitivity:  divergence of resampled continuations from the
+                             same state (requires multiple seeds per state)
+- coherence with task:       cos(s_t, e_x) per Spec 8.2
+
+Feature multicollinearity note: several features are strongly correlated by
+construction. Analyses using r_t must report the feature correlation matrix
+and use methods robust to collinearity; claims about individual features
+require the others as covariates.
+
+5.6 Functional Effect Profile
+-----------------------------
+
+For a transition or trajectory segment, define:
+
+e_i = (
+    ΔBreadth,
+    ΔCoherence,
+    ΔUncertainty,
+    ΔHypothesisQuality,
+    ΔTestability,
+    ΔOutcome,
+    Persistence
+)
+
+Each component carries a metric-type label (B1):
+
+- ΔBreadth, ΔCoherence, Persistence: Type G / Type E
+- ΔHypothesisQuality, ΔTestability:  Type J (judge separation B2 applies)
+- ΔUncertainty:                      Type G (e.g., entropy of continuations)
+                                     or Type J; the choice is fixed and logged
+- ΔOutcome:                          Type O (hidden-solution tasks)
+
+Functional effect profiles are required because geometric similarity alone
+does not establish functional equivalence.
+
+
+6. Operators as Equivalence Classes
+===================================
+
+The plan does not begin by assuming four operators.
+
+Let:
+
+D = {δ_1, δ_2, ..., δ_N}
+
+be the observed transition set.
+
+Define functional equivalence:
+
+δ_i ~ δ_j
+
+when, under comparable trajectory contexts, the two transitions:
+
+- produce similar changes in trajectory geometry
+- produce similar functional effect profiles
+- retain similarity across prompts and domains
+- have comparable downstream consequences
+
+A discovered operator candidate is an equivalence class:
+
+O_k = [δ]_k
+
+or, more generally, a class of context-dependent local transformations:
+
+O_k = {
+    (Γ_context, δ)
+    with recurring functional effect
+}
+
+Human labels such as EXPAND, CHALLENGE, CONNECT, and CONSOLIDATE may later be
+assigned for interpretability.
+
+They are not axioms of the mature model.
+
+
+7. Seed Intervention Families
+=============================
+
+The four existing operator families are retained only as data-generation
+instruments:
+
+- EXPAND
+- CHALLENGE
+- CONNECT
+- CONSOLIDATE
+
+Additional trajectory sources must include:
+
+- direct reasoning
+- chain-of-thought
+- self-reflection
+- random operator schedules
+- adversarial prompts
+- analogy prompts
+- contradiction prompts
+- consolidation prompts
+- unsuccessful reasoning
+- successful reasoning
+- random latent perturbations where technically safe
+
+Purpose:
+
+Generate broad trajectory diversity without forcing the final latent taxonomy
+to match the seed labels.
+
+Coverage requirement (new in v0.2): at least 30% of Atlas episodes must come
+from non-operator sources (direct reasoning, plain chain-of-thought, random
+schedules), so that mode discovery has substantial data in which the seed
+taxonomy was never expressed. This supports the independence test of
+Section 9.5.
+
+
+8. Phase A — Trajectory Atlas
+=============================
+
+8.1 Objective
+-------------
+
+Construct a large observational map of latent reasoning trajectories without
+assuming a final operator alphabet.
+
+8.2 Dataset and Sizing
+----------------------
+
+Use multiple domains, including:
+
+- causal puzzles
+- abductive reasoning
+- scientific explanation
+- hidden-rule discovery
+- contradiction resolution
+- design problems
+- synthetic hypothesis reconstruction
+
+Required variation:
+
+- successful and unsuccessful episodes
+- multiple seeds
+- multiple prompt families
+- multiple reasoning schedules
+- matched compute budgets
+- multiple problem difficulty levels
+
+Sizing targets (new in v0.2; pilot tier):
+
+- ≥ 4 domains, ≥ 50 problems per domain
+- ≥ 5 seeds per problem-condition pair
+- ≥ 10 trajectory sources per Section 7, with the 30% non-operator floor
+- target: ≥ 10,000 episodes, ≥ 10^5 transitions at the reasoning-move step
+  (correspondingly more at finer steps)
+
+Rationale: cluster-stability analysis (Section 9.6) requires resampling; rule
+of thumb is ≥ 100 segments per candidate mode per domain for cross-domain
+recurrence tests. A pilot-based power analysis fixes confirmatory sizes,
+per B4.
+
+8.3 Recorded Data
+-----------------
+
+For every episode, record:
+
+- problem, domain, and difficulty level
+- model and checkpoint
+- state encoder
+- selected layers
+- normalization parameters (μ, W, calibration-set ID)
+- step definition (Section 4) and window w
+- full state sequence
+- transition sequence
+- prompt or intervention provenance (trajectory source, Section 7)
+- operator seed label, if any
+- decoded intermediate outputs
+- final output
+- objective outcome
+- judge-based scores with judge identity (B2)
+- realized compute, both ledgers (B4)
+- episode length in steps and tokens
+
+8.4 Analysis
+------------
+
+The Trajectory Atlas should include:
+
+- PCA and low-rank subspace analysis
+- manifold visualization for exploration only
+- clustering of transitions
+- clustering of trajectory segments
+- change-point detection
+- recurrence analysis
+- trajectory alignment
+- dynamic time warping where appropriate
+- spectral analysis
+- local dimensionality estimation
+- attractor-like region detection
+- branching and convergence analysis
+- outcome-conditioned trajectory comparison (with the controls of 8.6)
+
+Visualization is exploratory.
+
+All confirmatory claims must rely on held-out quantitative evaluation.
+
+8.5 Primary Question
+--------------------
+
+Do recurring trajectory motifs exist that:
+
+- replicate across seeds
+- survive cross-paraphrase evaluation
+- survive cross-domain evaluation
+- survive at least two step definitions (S3)
+- predict functional effects
+- predict downstream outcomes?
+
+8.6 Outcome-Conditioning Confound Controls
+------------------------------------------
+
+(New in v0.2.)
+
+Successful and unsuccessful episodes differ in trivial ways — length,
+difficulty, early stopping — and any of these can masquerade as a "motif of
+success". Required controls:
+
+C1: Length matching. Outcome-conditioned comparisons are performed within
+    strata of episode length (in steps and in tokens), or with length as an
+    explicit covariate; a motif claimed to predict success must retain
+    predictive value at fixed length.
+
+C2: Difficulty stratification. Problems carry difficulty levels (8.2);
+    outcome comparisons are made within difficulty strata. A motif that only
+    separates easy from hard problems is a difficulty detector.
+
+C3: Stopping-artifact check. Features computed near episode end (convergence,
+    recurrence) are additionally evaluated on end-truncated trajectories to
+    ensure they are not artifacts of the stopping rule.
+
+C4: Domain balance. Outcome-conditioned motif claims must hold within at
+    least two domains individually, not only in the pooled data.
+
+8.7 Parallel Low-Cost Track: Seed-Operator Separability
+-------------------------------------------------------
+
+(New in v0.2.)
+
+The Atlas records seed labels (8.3), so the Spec's Experiment A — separability
+of EXPAND / CHALLENGE / CONNECT / CONSOLIDATE transitions, with
+cross-paraphrase and cross-domain splits — runs on Atlas data at near-zero
+marginal cost.
+
+This track is run in parallel and reported regardless of Atlas outcomes:
+
+- If separability holds, the discovery program proceeds with evidence that
+  the state representation carries functional signal at all.
+- If separability fails, Gate A failure semantics (Section 15) apply early,
+  before major discovery investment.
+
+This mitigates the main schedule risk of the trajectory-first ordering:
+remaining in exploratory analysis indefinitely.
+
+
+9. Phase B — Functional Mode Discovery
+======================================
+
+9.1 Objective
+-------------
+
+Identify latent modes based on both trajectory geometry and functional
+consequence.
+
+9.2 Functional Distance
+-----------------------
+
+Define:
+
+d_functional(i, j)
+    =
+    α d_latent(i, j)
+    +
+    β d_effect(e_i, e_j)
+    +
+    γ d_context(c_i, c_j)
+
+where:
+
+d_latent:
+distance between transition or trajectory representations
+
+d_effect:
+distance between functional effect profiles (component types per 5.6;
+Type J components obey B2)
+
+d_context:
+penalty for comparing non-equivalent initial states, operationalized as:
+
+d_context(c_i, c_j)
+    = 1 - cos(s_before_i, s_before_j)
+      combined with a domain mismatch indicator
+
+(other operationalizations are permitted but must be fixed and logged per
+experiment)
+
+9.3 Weight Sensitivity Requirement
+----------------------------------
+
+(New in v0.2.)
+
+Discovered modes are a function of (α, β, γ). Therefore:
+
+W1: Mode discovery is repeated over a pre-declared grid of (α, β, γ)
+    (minimum: geometry-dominant, effect-dominant, and balanced settings).
+
+W2: A mode is reportable only if it recurs — same membership up to a
+    matching tolerance — across a contiguous region of the weight grid.
+    Modes that exist at a single weight setting are artifacts of that
+    setting.
+
+W3: The weight grid and matching tolerance are fixed before confirmatory
+    analysis (B4).
+
+9.4 Discovery Methods
+---------------------
+
+Candidate methods include:
+
+- Gaussian mixture models
+- spectral clustering
+- hidden Markov models
+- switching linear dynamical systems
+- state-space models
+- contrastive representation learning
+- nonlinear mode discovery
+- mixture-of-experts identification
+
+No single clustering method is treated as ground truth.
+
+Stable modes must appear under multiple reasonable analysis choices.
+
+9.5 Seed-Label Independence
+---------------------------
+
+(New in v0.2.)
+
+Because most Atlas trajectories are generated by prompted seed interventions,
+mode discovery risks merely recovering the seed taxonomy — a self-fulfilling
+result. Required tests:
+
+I1: Mutual information between discovered mode assignments and seed labels is
+    reported, with a permutation null. Near-perfect correspondence means the
+    discovery added nothing beyond the seeds.
+
+I2: A discovered mode is independently interesting if it (a) subdivides a
+    seed family into functionally distinct sub-modes, (b) merges transitions
+    across seed families with a shared effect profile, or (c) appears in
+    non-operator-source trajectories (the ≥ 30% floor of Section 7).
+
+I3: Confirmatory mode claims require recurrence in non-operator-source
+    trajectories. Modes found only under seed prompting are classified as
+    prompt-induced until shown otherwise.
+
+9.6 Stability Criteria
+----------------------
+
+A functional mode is considered provisionally stable when it shows:
+
+- cluster stability under resampling
+- cross-seed recurrence
+- cross-paraphrase recurrence
+- cross-domain recurrence
+- recurrence across the weight grid (W2)
+- presence in non-operator sources (I3)
+- consistent effect profile
+- predictive value for future trajectory evolution
+
+If clusters track only prompt wording, domain, output length, or difficulty,
+they are artifacts (see 8.6).
+
+
+10. Phase C — Causal Operator Construction
+==========================================
+
+10.1 Objective
+--------------
+
+Convert stable functional modes into reusable causal transformations.
+
+10.2 Candidate Operator Forms
+-----------------------------
+
+Fixed vector:
+
+T_k(s) = s + v_k
+
+Linear operator:
+
+T_k(s) = A_k s + b_k
+
+State-dependent vector field:
+
+T_k(s) = s + v_k(s)
+
+Context-dependent operator:
+
+T_k(s, Γ_(t-w:t))
+
+Nonlinear operator:
+
+T_k(s) = f_k(s)
+
+10.3 Intervention Test
+----------------------
+
+Given an unseen state s_t, apply via the Spec injection mechanism (B6):
+
+s'_(t+1) = T_k(s_t, Γ_(t-w:t))
+
+The operator succeeds only if the resulting trajectory produces the expected
+effect profile:
+
+e(s'_(t+1)) ≈ mean_effect(O_k)
+
+without an explicit textual instruction naming the function.
+
+10.4 Required Controls
+----------------------
+
+Compare discovered operators against:
+
+- random directions
+- norm-matched random directions
+- PCA directions
+- standard activation steering vectors
+- prompt-only interventions
+- shuffled mode labels
+- no-intervention controls
+
+10.5 Operator Validation
+------------------------
+
+A candidate becomes a validated operator only if it demonstrates:
+
+1. repeatability
+2. cross-context transfer
+3. causal behavioral effect
+4. downstream utility
+5. robustness to injection configuration
+6. effect beyond prompt artifacts
+
+
+11. Phase D — Trajectory Regime Discovery
+=========================================
+
+11.1 Objective
+--------------
+
+Determine whether productive reasoning can be characterized by a
+low-dimensional trajectory regime.
+
+11.2 Feature Vector
+-------------------
+
+r(Γ) uses the features and definitions of Section 5.5.
+
+The initial CLCD Ω metric is treated as one candidate summary, not as a fixed
+law.
+
+11.3 Outcome Model
+------------------
+
+Learn:
+
+P(Y_good | r(Γ))
+
+where Y_good is primarily based on objective hidden-solution outcomes
+(Type O).
+
+Secondary outcomes may include:
+
+- hypothesis quality
+- novelty
+- testability
+- explanatory power
+
+Multiplicity control (new in v0.2): with ≥ 11 correlated features and
+flexible models, apparent predictive structure is easy to find. The outcome
+model is fit on a development split and evaluated once on a held-out
+confirmatory split; permutation-based feature importance with family-wise
+correction (B4); the confound controls of 8.6 (length, difficulty) enter as
+covariates.
+
+11.4 Scalar or Vector Regime
+----------------------------
+
+If a stable low-dimensional scalar summary exists:
+
+Ω = f(r(Γ))
+
+it may be retained as the trajectory regime metric.
+
+If no stable scalar exists, use a multidimensional regime vector:
+
+Ω_vec = (
+    exploration,
+    stability,
+    coherence,
+    plasticity,
+    convergence
+)
+
+Status note (new in v0.2): the Ω_vec component names are placeholders. Each
+must be defined as an explicit function of r(Γ) before use; undefined named
+dimensions may not appear in any analysis.
+
+The theory does not require a single scalar if the data do not support one.
+
+11.5 Productive Zone Test
+-------------------------
+
+Test whether:
+
+P(Y_good | Ω in productive region)
+    >
+P(Y_good | Ω outside productive region)
+
+The productive region must be selected on development data and evaluated once
+on held-out data, consistent with the Spec's pre-registration rules (Ω1-Ω3).
+
+
+12. Phase E — Closed-Loop Control
+=================================
+
+12.1 Objective
+--------------
+
+Use validated operators to control trajectory regimes dynamically.
+
+12.2 Controller State
+---------------------
+
+z_t = (
+    current trajectory features,
+    recent mode history,
+    operator history,
+    task progress,
+    compute consumed,
+    current regime estimate
+)
+
+12.3 Regime Target Definition and Data Splits
+---------------------------------------------
+
+(New in v0.2. v0.1 used a desired regime r* without defining its origin.)
+
+The desired regime r_t* is derived from the Phase D productive region: it is
+the point (or set) in regime space associated with highest P(Y_good) on the
+Phase D development split.
+
+Leakage rule L1: the data used to (a) discover the productive region,
+(b) train the controller, and (c) evaluate the controller must be three
+disjoint splits. If the regime target and the controller policy are derived
+from the same episodes that later score the controller, the evaluation is
+circular.
+
+Leakage rule L2: judges used in controller training obey B2 with respect to
+outcome evaluation.
+
+12.4 Control Objective
+----------------------
+
+The controller does not select human labels as its final abstraction.
+
+It selects the transformation expected to move the future trajectory toward
+the productive regime:
+
+T_t*
+    =
+argmin over T_k
+E[
+    d(
+        r(Γ_(t+1)),
+        r_t*
+    )
+]
+
+12.5 Trajectory Functional
+--------------------------
+
+Define a trajectory-level objective:
+
+J[Γ]
+    =
+    Q_outcome(Γ)
+    - λ_1 Compute(Γ)
+    - λ_2 Drift(Γ)
+    - λ_3 Repetition(Γ)
+    + λ_4 ProductiveReorganization(Γ)
+
+The controller seeks:
+
+max over operator sequence
+E[J[Γ]]
+
+12.6 Controller Comparisons
+---------------------------
+
+Compare:
+
+- no controller
+- fixed operator cycle
+- random operator policy
+- rule-based CLCD controller (from the Spec)
+- learned mode controller
+- oracle controller for upper-bound estimation
+
+All comparisons require equal realized compute and equal tuning budgets
+(B4, B5).
+
+
+13. Additional Related Work
+===========================
+
+(New in v0.2. Supplements Spec Section 3; same citation-verification rule.)
+
+13.1 Options and skill discovery in hierarchical RL
+---------------------------------------------------
+
+Phases B-C-E are structurally an options / skill-discovery program: discover
+reusable temporally-extended transformations from experience, then learn a
+policy over them. Directly relevant lines:
+
+- options framework (Sutton, Precup, Singh 1999)
+- unsupervised skill discovery via mutual-information objectives
+  (e.g., DIAYN — Eysenbach et al. 2019)
+- successor features and transferable behaviors
+
+What CLCD adds: the "environment" is the model's own latent reasoning space;
+skills act on activations rather than an external world; and skill validity
+is defined by functional effect profiles on reasoning outcomes. The RL
+literature supplies discovery objectives (mutual information between skill
+and visited states) that can be reused in Phase B.
+
+13.2 Latent dynamics methods from computational neuroscience
+------------------------------------------------------------
+
+The Phase B toolset (switching linear dynamical systems, state-space models,
+HMM segmentation of latent trajectories) is standard in neural population
+dynamics analysis (e.g., Linderman et al. on switching LDS; low-dimensional
+dynamics in motor cortex). This literature also documents the field's main
+pitfall — descriptive dynamical structure without causal validation — which
+is exactly the Gate B / Gate C distinction of this plan.
+
+[TODO: full citation pass before external circulation, per Spec 3.5 rule.]
+
+
+14. Experimental Sequence
+=========================
+
+Experiment 0:
+Trajectory Atlas
+
+Question:
+Does recurring structure exist?
+
+
+Experiment 0b (parallel, low cost — Section 8.7):
+Seed-Operator Separability on Atlas data
+
+Question:
+Does the state representation carry functional signal at all?
+
+
+Experiment 1:
+Functional Mode Discovery
+
+Question:
+Do recurring structures correspond to stable functional effects?
+
+
+Experiment 2:
+Causal Mode Intervention
+
+Question:
+Can stable modes be converted into causal operators?
+
+
+Experiment 3:
+Regime Discovery
+
+Question:
+Can trajectory geometry predict reasoning outcomes?
+
+
+Experiment 4:
+Closed-Loop Control
+
+Question:
+Can a controller use discovered operators to improve reasoning under matched
+compute?
+
+
+15. Decision Gates
+==================
+
+Gate A:
+No reproducible trajectory structure.
+
+Failure semantics (extended in v0.2): a negative Atlas result cannot by
+itself distinguish (i) absence of structure from (ii) an inadequate encoder,
+normalization, or step definition. Gate A is only conclusive after the
+robustness sweep: ≥ 2 encoders, ≥ 2 normalizations (B3), ≥ 2 step
+definitions (S3). If the sweep was not completed, the consequence is
+"representation revision", not "hypothesis unsupported".
+
+Consequence (after a completed sweep):
+The operator hypothesis is not supported under the tested state
+representations.
+
+
+Gate B:
+Geometric clusters exist but lack stable functional effects.
+
+Consequence:
+The clusters are descriptive geometry, not functional operators.
+
+
+Gate C:
+Functional modes exist but cannot be causally applied.
+
+Consequence:
+The modes are correlational markers, not controllable operators.
+(Spec 6.4 applies: failed injection-validity checks indict the encoder /
+injection pair, not the modes.)
+
+
+Gate D:
+Operators work but no stable productive regime exists.
+
+Consequence:
+Use direct outcome-based control; remove Ω from the core architecture.
+
+
+Gate E:
+Regimes exist but controller does not improve outcomes.
+
+Consequence:
+Reject or revise closed-loop operator selection.
+
+
+Gate F:
+Controller gains disappear under matched compute.
+
+Consequence:
+Report orchestration overhead rather than reasoning improvement.
+
+
+16. Falsification Conditions
+============================
+
+The trajectory-first CLCD program is weakened if:
+
+1. latent trajectories are not reproducible under matched conditions
+
+2. discovered modes fail cross-domain and cross-paraphrase tests
+
+3. functional effects do not align with geometric modes
+
+4. mode identity depends primarily on prompt wording (I1-I3)
+
+5. causal interventions fail despite valid injection
+
+6. discovered transformations do not transfer
+
+7. trajectory features do not predict objective outcomes after length and
+   difficulty controls (8.6)
+
+8. controller policies do not outperform random or fixed schedules
+
+9. all gains are explained by extra compute
+
+10. simpler established steering or search methods fully explain the results
+
+
+17. Relationship to the Spec (CLCD Architecture Specification v0.2)
+===================================================================
+
+The Spec remains valid as an implementation framework.
+
+The trajectory-first plan changes the epistemic status of several components.
+
+Previous status:
+
+EXPAND, CHALLENGE, CONNECT, CONSOLIDATE
+    =
+candidate operator alphabet
+
+Revised status:
+
+EXPAND, CHALLENGE, CONNECT, CONSOLIDATE
+    =
+seed intervention families
+
+
+Previous status:
+
+Ω
+    =
+defined trajectory regime metric
+
+Revised status:
+
+Ω
+    =
+candidate summary to be compared against learned regime representations
+
+
+Previous status:
+
+Operator Discovery Experiment
+    =
+first experiment
+
+Revised status:
+
+Trajectory Atlas (with parallel Experiment 0b)
+    =
+first experiment
+
+
+All Spec protocols listed in Section 3 (B1-B6) remain binding.
+
+
+18. Minimum Trajectory Atlas Prototype
+======================================
+
+The minimum prototype requires:
+
+1. one open-weight LLM with hidden-state access
+
+2. one fixed state encoder and two normalization variants (B3)
+
+3. two step definitions (S3)
+
+4. at least three reasoning domains
+
+5. successful and unsuccessful reasoning episodes with difficulty labels
+
+6. multiple prompt families and seeds; ≥ 30% non-operator sources
+   (Section 7)
+
+7. full trajectory logging per 8.3
+
+8. objective hidden-solution outcomes
+
+9. exploratory trajectory analysis
+
+10. held-out tests for recurring motifs
+
+11. Experiment 0b (seed-operator separability) on the same data
+
+12. no claim of causal operators at this stage
+
+
+19. Immediate Actions
+=====================
+
+1. Freeze the Spec as the current architecture reference; adopt B1-B6 as
+   binding for this plan.
+
+2. Treat the four named operators as seed interventions only.
+
+3. Select the first open-weight model.
+
+4. Fix two step definitions per Section 4 (recommended: ST-2 and ST-3).
+
+5. Define the state extraction layer and pooling method; freeze
+   normalization on a calibration split.
+
+6. Create the first hidden-solution task set with difficulty labels.
+
+7. Generate matched successful and unsuccessful trajectories with length
+   and difficulty stratification (8.6).
+
+8. Build the Trajectory Atlas logging schema (8.3), including the ≥ 30%
+   non-operator source floor.
+
+9. Run Experiment 0b (separability) as soon as Atlas data exists.
+
+10. Run exploratory low-rank, recurrence, and change-point analyses.
+
+11. Test motif stability across seeds, prompts, domains, step definitions,
+    and the (α, β, γ) weight grid.
+
+12. Run the seed-label independence tests (9.5) on any candidate modes.
+
+13. Do not train a controller before functional modes are validated.
+
+14. Do not claim operators before causal intervention succeeds.
+
+
+20. Current Central Claim
+=========================
+
+The strongest defensible CLCD claim at this stage is:
+
+Machine reasoning may generate structured latent trajectories containing
+recurring functional modes.
+
+If those modes can be discovered, causally reproduced, and selected through
+closed-loop control, they may form the basis of a new latent-state
+architecture for machine reasoning and hypothesis generation.
+
+
+End of CLCD Trajectory-First Research Plan v0.2
+===============================================
